@@ -1,65 +1,152 @@
 import streamlit as st
-import pandas as pd
 import time
+from datetime import datetime
 
-st.set_page_config(page_title="Project Engine", layout="wide")
+# --- 1. THEME & COOKBOOK STYLING ---
+st.set_page_config(page_title="The Project Kitchen", page_icon="👩‍🍳", layout="wide")
 
-# --- DATABASE SIMULATION ---
-# In a real app, this would be a Google Sheet or Database
-if 'logs' not in st.session_state:
-    st.session_state.logs = []
-if 'chat' not in st.session_state:
-    st.session_state.chat = []
-
-# --- APP LAYOUT ---
-st.title("🚀 Team Progress Engine")
-st.subheader("Focus on the work, not the clock.")
-
-# --- STAGE TRACKING (From your screenshot) ---
-stages = {
-    "RESEARCH": {"goal": 480, "unit": "hours", "current": 120},
-    "BRIEFINGS": {"goal": 1, "unit": "day", "current": 0.5},
-    "ACTION PLAN": {"goal": 7, "unit": "days", "current": 2},
-    "CREATION": {"goal": 150, "unit": "days", "current": 10}, # 5 months converted
-    "REPORT": {"goal": 25, "unit": "days", "current": 5},
-}
-
-cols = st.columns(len(stages))
-
-for i, (name, data) in enumerate(stages.items()):
-    with cols[i]:
-        progress = data['current'] / data['goal']
-        st.metric(name, f"{data['current']} / {data['goal']} {data['unit']}")
-        st.progress(min(progress, 1.0))
-
-# --- THE INTERACTIVE WORK LOG ---
-st.divider()
-col_a, col_b = st.columns([1, 1])
-
-with col_a:
-    st.markdown("### ✍️ Log Your Progress")
-    member = st.selectbox("Who is logging?", ["Cathy", "Helen"])
-    stage_select = st.selectbox("Which stage?", list(stages.keys()))
-    amount = st.number_input(f"Amount (Hours/Days)", min_value=0.1)
+st.markdown("""
+    <style>
+    /* Main Background */
+    .stApp {
+        background-color: #FFFDF5;
+    }
     
-    if st.button("Add to Total"):
-        entry = f"{member} added {amount} to {stage_select}"
-        st.session_state.logs.append(entry)
-        st.success("Progress saved!")
+    /* Headers & Fonts */
+    h1, h2, h3 {
+        color: #5D4037;
+        font-family: 'Georgia', serif;
+    }
 
-with col_b:
-    st.markdown("### 💬 Team Chat & Brainstorm")
-    user_msg = st.text_input("Send a note to your partner:")
-    if st.button("Send"):
-        st.session_state.chat.append(f"**{member}**: {user_msg}")
+    /* Instagram-style Bubble Chat */
+    .chat-bubble {
+        background-color: #FFFFFF;
+        border-radius: 18px;
+        padding: 12px 18px;
+        margin-bottom: 8px;
+        display: inline-block;
+        max-width: 85%;
+        border: 1px solid #E0E0E0;
+        box-shadow: 1px 1px 3px rgba(0,0,0,0.05);
+        font-family: 'Helvetica Neue', sans-serif;
+        color: #333;
+    }
+    .user-label {
+        font-weight: bold;
+        font-size: 0.85em;
+        margin-bottom: 2px;
+        color: #8D6E63;
+        margin-left: 10px;
+    }
+
+    /* Custom Button Style */
+    .stButton>button {
+        border-radius: 12px;
+        font-weight: bold;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+# --- 2. SESSION STATE INITIALIZATION ---
+if 'total_seconds' not in st.session_state: st.session_state.total_seconds = 0
+if 'is_running' not in st.session_state: st.session_state.is_running = False
+if 'start_time' not in st.session_state: st.session_state.start_time = None
+if 'messages' not in st.session_state:
+    st.session_state.messages = [
+        {"user": "System", "text": "Welcome to the Kitchen! Start cooking to track progress."}
+    ]
+
+# --- 3. SIDEBAR: CHEF STATUS (Mood Indicator) ---
+with st.sidebar:
+    st.header("🖼️ The Fridge")
+    st.write("Post your current academic workload:")
     
-    # Display Chat
-    for msg in reversed(st.session_state.chat):
-        st.write(msg)
+    c_mood = st.select_slider("Cathy's Vibe", options=["😊", "😐", "😫"], key="c_vibe")
+    h_mood = st.select_slider("Helen's Vibe", options=["😊", "😐", "😫"], key="h_vibe")
+    
+    st.divider()
+    st.markdown("### 🏷️ Status Meanings")
+    st.caption("😊 Chill: Send me tasks!")
+    st.caption("😐 Simmering: Uni is busy.")
+    st.caption("😫 Boiling: Do not disturb!")
 
-# --- RESEARCH SUMMARY TOOL ---
+# --- 4. TOP SECTION: STOVETOP (The Timer) ---
+st.title("🍳 The Project Kitchen")
+st.write("*Collaborative research at a low, steady heat.*")
+
+col_timer, col_actions = st.columns([2, 1])
+
+# Timer Logic
+if st.session_state.is_running:
+    current_elapsed = time.time() - st.session_state.start_time
+    display_time = st.session_state.total_seconds + current_elapsed
+else:
+    display_time = st.session_state.total_seconds
+
+# Format to HH:MM:SS
+h, rem = divmod(display_time, 3600)
+m, s = divmod(rem, 60)
+time_str = f"{int(h):02d}:{int(m):02d}:{int(s):02d}"
+
+with col_timer:
+    st.markdown(f"<h1 style='font-size: 70px; margin-top: 0;'>⏱️ {time_str}</h1>", unsafe_allow_html=True)
+
+with col_actions:
+    if not st.session_state.is_running:
+        if st.button("▶️ Start Cooking", use_container_width=True):
+            st.session_state.start_time = time.time()
+            st.session_state.is_running = True
+            st.rerun()
+    else:
+        if st.button("🛑 Stop & Save", use_container_width=True):
+            st.session_state.total_seconds += (time.time() - st.session_state.start_time)
+            st.session_state.is_running = False
+            st.rerun()
+    
+    if st.button("🧹 Reset Pot", use_container_width=True):
+        st.session_state.total_seconds = 0
+        st.session_state.is_running = False
+        st.rerun()
+
+# --- 5. MIDDLE SECTION: PROGRESS & BUBBLES ---
 st.divider()
-st.markdown("### 📝 Research Proposal Summarizer")
-research_text = st.text_area("Paste your latest findings or pseudocode here to summarize for the report:")
-if st.button("Summarize for Cathy/Helen"):
-    st.info("Summary: This section identifies key sources for the 'Creation' stage and outlines the pseudocode logic.")
+left_kitchen, right_kitchen = st.columns([1, 1])
+
+with left_kitchen:
+    st.subheader("📖 The Recipe (Stages)")
+    # Goals in hours based on your screenshot
+    recipe_book = {
+        "Research": 480,
+        "Action Plan": 168,
+        "Creation": 3600,
+        "Report": 600
+    }
+    
+    curr_hrs = st.session_state.total_seconds / 3600
+    for stage, goal in recipe_book.items():
+        prog = min(curr_hrs / goal, 1.0)
+        st.write(f"**{stage}**")
+        st.progress(prog)
+        st.caption(f"{curr_hrs:.1f} / {goal} hours simmered")
+
+with right_kitchen:
+    st.subheader("💬 Kitchen Pings")
+    
+    # Display Chat Bubbles
+    chat_container = st.container(height=300)
+    with chat_container:
+        for msg in st.session_state.messages:
+            st.markdown(f'<div class="user-label">{msg["user"]}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="chat-bubble">{msg["text"]}</div>', unsafe_allow_html=True)
+
+    # Note Input
+    chat_col1, chat_col2 = st.columns([3, 1])
+    with chat_col1:
+        user_choice = st.selectbox("Who's talking?", ["Cathy", "Helen"], label_visibility="collapsed")
+        new_note = st.text_input("Leave a bubble note...", label_visibility="collapsed")
+    with chat_col2:
+        if st.button("Send ✨"):
+            if new_note:
+                st.session_state.messages.append({"user": user_choice, "text": new_note})
+                st.rerun()
+
